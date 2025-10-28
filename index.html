@@ -87,6 +87,69 @@
         box-shadow: 0 24px 48px rgba(15, 23, 42, 0.15);
       }
 
+      .viewer-wrapper:fullscreen,
+      .viewer-wrapper:-webkit-full-screen {
+        width: 100%;
+        height: 100%;
+        min-height: 100vh;
+        border-radius: 0;
+        box-shadow: none;
+      }
+
+      .fullscreen-button {
+        position: absolute;
+        top: 16px;
+        right: 16px;
+        width: 42px;
+        height: 42px;
+        border: none;
+        border-radius: 14px;
+        background: rgba(15, 23, 42, 0.55);
+        color: #f8fafc;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        cursor: pointer;
+        backdrop-filter: blur(10px);
+        transition: background 0.2s ease, transform 0.2s ease;
+        z-index: 6;
+      }
+
+      .fullscreen-button:hover {
+        background: rgba(37, 99, 235, 0.85);
+        transform: translateY(-1px);
+      }
+
+      .fullscreen-button:active {
+        transform: translateY(0);
+      }
+
+      .fullscreen-button svg {
+        width: 20px;
+        height: 20px;
+        fill: currentColor;
+      }
+
+      .fullscreen-button .icon-exit {
+        display: none;
+      }
+
+      .fullscreen-button[data-state="exit"] .icon-enter {
+        display: none;
+      }
+
+      .fullscreen-button[data-state="exit"] .icon-exit {
+        display: block;
+      }
+
+      .fullscreen-button[data-state="enter"] .icon-enter {
+        display: block;
+      }
+
+      .fullscreen-button[data-state="enter"] .icon-exit {
+        display: none;
+      }
+
       #panorama {
         width: 100%;
         height: 100%;
@@ -112,6 +175,7 @@
         font-size: 16px;
         font-weight: 500;
         transition: opacity 0.3s ease;
+        z-index: 4;
       }
 
       .overlay.hidden {
@@ -291,7 +355,15 @@
       </header>
       <main>
         <section class="viewer-column">
-          <div class="viewer-wrapper">
+          <div class="viewer-wrapper" id="viewer-wrapper">
+            <button class="fullscreen-button" id="fullscreen-btn" data-state="enter" title="全屏">
+              <svg class="icon-enter" viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M5 5h5V3H3v7h2V5zm5 14H5v-5H3v7h7v-2zm9-14h-5V3h7v7h-2V5zm-5 14h5v-5h2v7h-7v-2z"/>
+              </svg>
+              <svg class="icon-exit" viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M10 3H8v2H3v2h7V3zm7 0v4h7V5h-5V3h-2zm-7 18v-4H3v2h5v2h2zm7-2v2h2v-2h5v-2h-7v2z"/>
+              </svg>
+            </button>
             <div id="panorama"></div>
             <div id="loading-overlay" class="overlay hidden">
               <div class="spinner"></div>
@@ -306,7 +378,7 @@
             <p class="description">
               支持常见的 360° equirectangular 全景图。拖拽图片到灰框内，或点击按钮浏览本地文件。
             </p>
-            <label for="file-input" class="dropzone" id="dropzone">
+            <div class="dropzone" id="dropzone" role="button" tabindex="0" aria-label="上传全景图片">
               <svg viewBox="0 0 24 24" aria-hidden="true">
                 <path
                   d="M12 3a1 1 0 0 1 .894.553l1.618 3.236 3.57.52a1 1 0 0 1 .555 1.706l-2.584 2.518.61 3.556a1 1 0 0 1-1.451 1.054L12 14.347l-3.212 1.696a1 1 0 0 1-1.451-1.054l.61-3.556-2.584-2.518a1 1 0 0 1 .555-1.706l3.57-.52 1.618-3.236A1 1 0 0 1 12 3z"
@@ -318,8 +390,8 @@
               <p>拖拽图片到此处<br />或点击下方按钮上传</p>
               <span>支持 JPG、JPEG、PNG，推荐小于 10MB</span>
               <button type="button" class="browse-button" id="browse-button">选择图片</button>
-            </label>
-            <input id="file-input" type="file" accept="image/jpeg,image/png" hidden />
+            </div>
+            <input id="file-input" type="file" accept="image/jpeg,image/jpg,image/png" hidden />
             <p class="tip">鼠标左键拖拽旋转视角，滚轮缩放查看细节。</p>
           </div>
         </section>
@@ -331,7 +403,8 @@
       import { OrbitControls } from "https://cdn.jsdelivr.net/npm/three@0.156.0/examples/jsm/controls/OrbitControls.js";
 
       const DEFAULT_IMAGE = "https://images.unsplash.com/photo-1548690312-8710be8df039?auto=format&fit=crop&w=2400&q=80";
-      const SUPPORTED_TYPES = ["image/jpeg", "image/png"];
+      const SUPPORTED_TYPES = ["image/jpeg", "image/jpg", "image/png"];
+      const SUPPORTED_EXTENSIONS = ["jpg", "jpeg", "png"];
       const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
       const MIN_FOV = 35;
       const MAX_FOV = 90;
@@ -411,6 +484,10 @@
           );
         }
 
+        resize() {
+          this.#handleResize();
+        }
+
         #animate() {
           requestAnimationFrame(() => this.#animate());
           if (Math.abs(this.targetFov - this.currentFov) > 0.01) {
@@ -449,6 +526,8 @@
       const dropzone = document.getElementById("dropzone");
       const fileInput = document.getElementById("file-input");
       const browseButton = document.getElementById("browse-button");
+      const viewerWrapper = document.getElementById("viewer-wrapper");
+      const fullscreenBtn = document.getElementById("fullscreen-btn");
 
       const viewer = new PanoramaViewer(panoramaContainer);
       showLoading();
@@ -460,8 +539,24 @@
         },
       });
 
-      browseButton.addEventListener("click", () => fileInput.click());
-      dropzone.addEventListener("click", () => fileInput.click());
+      browseButton.addEventListener("click", (e) => {
+        e.stopPropagation();
+        fileInput.click();
+      });
+
+      dropzone.addEventListener("click", (e) => {
+        if (!e.target.closest("button")) {
+          fileInput.click();
+        }
+      });
+
+      dropzone.addEventListener("keydown", (event) => {
+        if (event.key === "Enter" || event.key === " ") {
+          event.preventDefault();
+          fileInput.click();
+        }
+      });
+
       fileInput.addEventListener("change", (event) => {
         if (event.target.files?.length) {
           handleFile(event.target.files[0]);
@@ -469,38 +564,90 @@
         }
       });
 
-      ["dragenter", "dragover"].forEach((eventName) => {
-        dropzone.addEventListener(eventName, (event) => {
-          event.preventDefault();
-          event.stopPropagation();
-          dropzone.classList.add("active");
-        });
+      let dropzoneDragCounter = 0;
+
+      dropzone.addEventListener("dragenter", (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        dropzoneDragCounter += 1;
+        if (event.dataTransfer) {
+          event.dataTransfer.dropEffect = "copy";
+        }
+        dropzone.classList.add("active");
       });
 
-      ["dragleave", "dragend", "drop"].forEach((eventName) => {
-        dropzone.addEventListener(eventName, (event) => {
-          event.preventDefault();
-          event.stopPropagation();
+      dropzone.addEventListener("dragover", (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        if (event.dataTransfer) {
+          event.dataTransfer.dropEffect = "copy";
+        }
+      });
+
+      dropzone.addEventListener("dragleave", (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        dropzoneDragCounter = Math.max(0, dropzoneDragCounter - 1);
+        if (dropzoneDragCounter === 0) {
           dropzone.classList.remove("active");
-        });
+        }
+      });
+
+      dropzone.addEventListener("dragend", (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        dropzoneDragCounter = 0;
+        dropzone.classList.remove("active");
       });
 
       dropzone.addEventListener("drop", (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        dropzoneDragCounter = 0;
+        dropzone.classList.remove("active");
         const files = event.dataTransfer?.files;
         if (files?.length) {
           handleFile(files[0]);
         }
       });
 
+      window.addEventListener(
+        "dragover",
+        (event) => {
+          event.preventDefault();
+        },
+        { passive: false }
+      );
+
+      window.addEventListener(
+        "drop",
+        (event) => {
+          event.preventDefault();
+        },
+        { passive: false }
+      );
+
       function handleFile(file) {
         hideError();
-        if (!SUPPORTED_TYPES.includes(file.type)) {
+        const normalizedType = (file.type || "").toLowerCase();
+        const extensionMatch = file.name ? /\.([^.]+)$/.exec(file.name) : null;
+        const fileExtension = extensionMatch ? extensionMatch[1].toLowerCase() : "";
+        const isValidType =
+          (normalizedType && SUPPORTED_TYPES.includes(normalizedType)) ||
+          (fileExtension && SUPPORTED_EXTENSIONS.includes(fileExtension));
+
+        if (!isValidType) {
           showError("暂不支持的文件格式，请选择 JPG 或 PNG 全景图。");
           return;
         }
 
         if (file.size > MAX_FILE_SIZE) {
           showError("文件体积过大，请选择小于 10MB 的图片。");
+          return;
+        }
+
+        if (file.size === 0) {
+          showError("文件为空，请选择有效的图片文件。");
           return;
         }
 
@@ -536,6 +683,78 @@
         errorBanner.textContent = "";
         errorBanner.classList.remove("active");
       }
+
+      const fullscreenEvents = [
+        "fullscreenchange",
+        "webkitfullscreenchange",
+        "mozfullscreenchange",
+        "MSFullscreenChange",
+      ];
+
+      fullscreenBtn.addEventListener("click", () => {
+        if (isViewerFullscreen()) {
+          exitFullscreen();
+        } else {
+          enterFullscreen(viewerWrapper);
+        }
+      });
+
+      fullscreenEvents.forEach((eventName) => {
+        document.addEventListener(eventName, handleFullscreenChange);
+      });
+
+      function getFullscreenElement() {
+        return (
+          document.fullscreenElement ||
+          document.webkitFullscreenElement ||
+          document.mozFullScreenElement ||
+          document.msFullscreenElement ||
+          null
+        );
+      }
+
+      function isViewerFullscreen() {
+        return getFullscreenElement() === viewerWrapper;
+      }
+
+      function enterFullscreen(element) {
+        const request =
+          element.requestFullscreen?.() ||
+          element.webkitRequestFullscreen?.() ||
+          element.mozRequestFullScreen?.() ||
+          element.msRequestFullscreen?.();
+
+        if (request instanceof Promise) {
+          request.catch(() => {
+            showError("无法进入全屏模式，请检查浏览器设置。");
+          });
+        }
+      }
+
+      function exitFullscreen() {
+        const exit =
+          document.exitFullscreen?.() ||
+          document.webkitExitFullscreen?.() ||
+          document.mozCancelFullScreen?.() ||
+          document.msExitFullscreen?.();
+
+        if (exit instanceof Promise) {
+          exit.catch(() => {
+            showError("无法退出全屏模式，请检查浏览器设置。");
+          });
+        }
+      }
+
+      function handleFullscreenChange() {
+        const isActive = isViewerFullscreen();
+        const label = isActive ? "退出全屏" : "全屏查看";
+        fullscreenBtn.setAttribute("data-state", isActive ? "exit" : "enter");
+        fullscreenBtn.setAttribute("title", label);
+        fullscreenBtn.setAttribute("aria-label", label);
+        setTimeout(() => viewer.resize(), 60);
+      }
+
+      handleFullscreenChange();
     </script>
   </body>
 </html>
