@@ -1,0 +1,541 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>360°全景照片查看器</title>
+    <link rel="preconnect" href="https://cdn.jsdelivr.net" />
+    <style>
+      :root {
+        color-scheme: light dark;
+        --bg-color: #f3f4f6;
+        --card-bg: rgba(255, 255, 255, 0.9);
+        --text-color: #1f2937;
+        --accent-color: #2563eb;
+        --accent-hover: #1d4ed8;
+        --border-color: rgba(31, 41, 55, 0.12);
+        --error-bg: rgba(220, 38, 38, 0.08);
+        --error-text: #b91c1c;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        font-family: "Inter", "PingFang SC", "Microsoft YaHei", sans-serif;
+        background: var(--bg-color);
+        color: var(--text-color);
+        min-height: 100vh;
+      }
+
+      .app {
+        max-width: 1200px;
+        margin: 0 auto;
+        padding: 32px 20px 56px;
+        display: flex;
+        flex-direction: column;
+        gap: 28px;
+      }
+
+      header {
+        text-align: center;
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+      }
+
+      header h1 {
+        margin: 0;
+        font-size: clamp(24px, 3vw, 36px);
+        font-weight: 700;
+        letter-spacing: 0.02em;
+      }
+
+      header p {
+        margin: 0;
+        color: rgba(31, 41, 55, 0.72);
+        font-size: clamp(14px, 2vw, 18px);
+      }
+
+      main {
+        display: grid;
+        grid-template-columns: repeat(12, 1fr);
+        gap: 20px;
+      }
+
+      .viewer-column {
+        grid-column: span 8;
+        min-width: 0;
+      }
+
+      .upload-column {
+        grid-column: span 4;
+        min-width: 0;
+        display: flex;
+        flex-direction: column;
+        gap: 16px;
+      }
+
+      .viewer-wrapper {
+        position: relative;
+        background: #000;
+        border-radius: 18px;
+        overflow: hidden;
+        min-height: clamp(320px, 50vh, 640px);
+        box-shadow: 0 24px 48px rgba(15, 23, 42, 0.15);
+      }
+
+      #panorama {
+        width: 100%;
+        height: 100%;
+        position: relative;
+      }
+
+      #panorama canvas {
+        display: block;
+        width: 100% !important;
+        height: 100% !important;
+      }
+
+      .overlay {
+        position: absolute;
+        inset: 0;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        align-items: center;
+        gap: 12px;
+        background: rgba(15, 23, 42, 0.65);
+        color: #f9fafb;
+        font-size: 16px;
+        font-weight: 500;
+        transition: opacity 0.3s ease;
+      }
+
+      .overlay.hidden {
+        opacity: 0;
+        pointer-events: none;
+      }
+
+      .spinner {
+        width: 36px;
+        height: 36px;
+        border-radius: 999px;
+        border: 3px solid rgba(248, 250, 252, 0.5);
+        border-top-color: #f8fafc;
+        animation: spin 0.8s linear infinite;
+      }
+
+      @keyframes spin {
+        to {
+          transform: rotate(360deg);
+        }
+      }
+
+      .error-banner {
+        padding: 12px 16px;
+        border-radius: 14px;
+        background: var(--error-bg);
+        color: var(--error-text);
+        border: 1px solid rgba(185, 28, 28, 0.12);
+        font-size: 14px;
+        line-height: 1.4;
+        display: none;
+      }
+
+      .error-banner.active {
+        display: block;
+      }
+
+      .panel {
+        background: var(--card-bg);
+        border-radius: 18px;
+        padding: 24px;
+        border: 1px solid var(--border-color);
+        box-shadow: 0 16px 32px rgba(15, 23, 42, 0.12);
+        backdrop-filter: blur(12px);
+      }
+
+      .panel h2 {
+        margin: 0 0 12px;
+        font-size: 20px;
+        font-weight: 600;
+      }
+
+      .panel p.description {
+        margin: 0 0 20px;
+        font-size: 14px;
+        color: rgba(31, 41, 55, 0.7);
+        line-height: 1.6;
+      }
+
+      .dropzone {
+        position: relative;
+        border: 2px dashed rgba(37, 99, 235, 0.35);
+        border-radius: 16px;
+        padding: 26px;
+        background: rgba(37, 99, 235, 0.06);
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        text-align: center;
+        gap: 12px;
+        cursor: pointer;
+        transition: border-color 0.2s ease, background 0.2s ease, transform 0.2s ease;
+      }
+
+      .dropzone:hover {
+        border-color: rgba(37, 99, 235, 0.6);
+        background: rgba(37, 99, 235, 0.1);
+        transform: translateY(-1px);
+      }
+
+      .dropzone.active {
+        border-color: var(--accent-color);
+        background: rgba(37, 99, 235, 0.15);
+      }
+
+      .dropzone svg {
+        width: 48px;
+        height: 48px;
+        fill: var(--accent-color);
+      }
+
+      .dropzone p {
+        margin: 0;
+        color: rgba(31, 41, 55, 0.84);
+        font-size: 15px;
+        line-height: 1.5;
+      }
+
+      .dropzone span {
+        color: rgba(31, 41, 55, 0.55);
+        font-size: 13px;
+      }
+
+      .browse-button {
+        border: none;
+        background: var(--accent-color);
+        color: #fff;
+        font-size: 15px;
+        padding: 10px 18px;
+        border-radius: 12px;
+        cursor: pointer;
+        transition: background 0.2s ease, transform 0.2s ease;
+      }
+
+      .browse-button:hover {
+        background: var(--accent-hover);
+        transform: translateY(-1px);
+      }
+
+      .tip {
+        margin: 0;
+        font-size: 13px;
+        color: rgba(31, 41, 55, 0.65);
+        line-height: 1.5;
+      }
+
+      @media (max-width: 960px) {
+        main {
+          grid-template-columns: 1fr;
+        }
+
+        .viewer-column,
+        .upload-column {
+          grid-column: auto;
+        }
+
+        .viewer-wrapper {
+          min-height: clamp(260px, 55vw, 480px);
+        }
+      }
+
+      @media (prefers-color-scheme: dark) {
+        :root {
+          --bg-color: #0f172a;
+          --card-bg: rgba(15, 23, 42, 0.7);
+          --text-color: #e2e8f0;
+          --border-color: rgba(226, 232, 240, 0.06);
+          --error-bg: rgba(248, 113, 113, 0.12);
+          --error-text: #fecaca;
+        }
+
+        header p,
+        .panel p.description,
+        .dropzone p,
+        .dropzone span,
+        .tip {
+          color: rgba(226, 232, 240, 0.78);
+        }
+
+        .dropzone {
+          border-color: rgba(96, 165, 250, 0.35);
+          background: rgba(37, 99, 235, 0.15);
+        }
+
+        .dropzone:hover {
+          border-color: rgba(96, 165, 250, 0.6);
+          background: rgba(37, 99, 235, 0.22);
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="app">
+      <header>
+        <h1>360°全景照片查看器</h1>
+        <p>点击或拖拽上传全景照片，使用鼠标自由旋转与缩放，探索完整的沉浸式体验。</p>
+      </header>
+      <main>
+        <section class="viewer-column">
+          <div class="viewer-wrapper">
+            <div id="panorama"></div>
+            <div id="loading-overlay" class="overlay hidden">
+              <div class="spinner"></div>
+              <span>加载中，请稍候…</span>
+            </div>
+          </div>
+          <div id="error-banner" class="error-banner"></div>
+        </section>
+        <section class="upload-column">
+          <div class="panel">
+            <h2>导入全景图</h2>
+            <p class="description">
+              支持常见的 360° equirectangular 全景图。拖拽图片到灰框内，或点击按钮浏览本地文件。
+            </p>
+            <label for="file-input" class="dropzone" id="dropzone">
+              <svg viewBox="0 0 24 24" aria-hidden="true">
+                <path
+                  d="M12 3a1 1 0 0 1 .894.553l1.618 3.236 3.57.52a1 1 0 0 1 .555 1.706l-2.584 2.518.61 3.556a1 1 0 0 1-1.451 1.054L12 14.347l-3.212 1.696a1 1 0 0 1-1.451-1.054l.61-3.556-2.584-2.518a1 1 0 0 1 .555-1.706l3.57-.52 1.618-3.236A1 1 0 0 1 12 3z"
+                  fill="currentColor"
+                  fill-rule="evenodd"
+                  clip-rule="evenodd"
+                />
+              </svg>
+              <p>拖拽图片到此处<br />或点击下方按钮上传</p>
+              <span>支持 JPG、JPEG、PNG，推荐小于 10MB</span>
+              <button type="button" class="browse-button" id="browse-button">选择图片</button>
+            </label>
+            <input id="file-input" type="file" accept="image/jpeg,image/png" hidden />
+            <p class="tip">鼠标左键拖拽旋转视角，滚轮缩放查看细节。</p>
+          </div>
+        </section>
+      </main>
+    </div>
+
+    <script type="module">
+      import * as THREE from "https://cdn.jsdelivr.net/npm/three@0.156.0/build/three.module.js";
+      import { OrbitControls } from "https://cdn.jsdelivr.net/npm/three@0.156.0/examples/jsm/controls/OrbitControls.js";
+
+      const DEFAULT_IMAGE = "https://images.unsplash.com/photo-1548690312-8710be8df039?auto=format&fit=crop&w=2400&q=80";
+      const SUPPORTED_TYPES = ["image/jpeg", "image/png"];
+      const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
+      const MIN_FOV = 35;
+      const MAX_FOV = 90;
+      const ZOOM_STEP = 4;
+
+      class PanoramaViewer {
+        constructor(container) {
+          this.container = container;
+          this.scene = new THREE.Scene();
+
+          const { width, height } = this.#getSize();
+          this.camera = new THREE.PerspectiveCamera(70, width / height, 0.1, 1100);
+          this.camera.position.set(0, 0, 0.1);
+          this.currentFov = this.camera.fov;
+          this.targetFov = this.camera.fov;
+
+          this.renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false });
+          this.renderer.setPixelRatio(window.devicePixelRatio);
+          this.renderer.setSize(width, height);
+          this.container.appendChild(this.renderer.domElement);
+
+          this.controls = new OrbitControls(this.camera, this.renderer.domElement);
+          this.controls.enableZoom = false;
+          this.controls.enablePan = false;
+          this.controls.enableDamping = true;
+          this.controls.dampingFactor = 0.08;
+          this.controls.rotateSpeed = 0.3;
+
+          this.textureLoader = new THREE.TextureLoader();
+          this.textureLoader.setCrossOrigin("anonymous");
+          this.requestToken = 0;
+
+          const geometry = new THREE.SphereGeometry(500, 64, 48);
+          geometry.scale(-1, 1, 1);
+          this.material = new THREE.MeshBasicMaterial({ color: 0xffffff });
+          this.sphere = new THREE.Mesh(geometry, this.material);
+          this.scene.add(this.sphere);
+
+          window.addEventListener("resize", () => this.#handleResize());
+          this.renderer.domElement.addEventListener("wheel", (event) => this.#handleWheel(event), {
+            passive: false,
+          });
+
+          this.#animate();
+        }
+
+        loadPanorama(url, { onLoad, onError } = {}) {
+          const currentRequest = ++this.requestToken;
+          this.textureLoader.load(
+            url,
+            (texture) => {
+              if (currentRequest !== this.requestToken) {
+                texture.dispose();
+                return;
+              }
+              texture.colorSpace = THREE.SRGBColorSpace;
+              texture.minFilter = THREE.LinearFilter;
+              texture.magFilter = THREE.LinearFilter;
+              if (this.material.map) {
+                this.material.map.dispose();
+              }
+              this.material.map = texture;
+              this.material.needsUpdate = true;
+              if (typeof onLoad === "function") {
+                onLoad();
+              }
+            },
+            undefined,
+            (error) => {
+              if (currentRequest !== this.requestToken) {
+                return;
+              }
+              if (typeof onError === "function") {
+                onError(error);
+              }
+            }
+          );
+        }
+
+        #animate() {
+          requestAnimationFrame(() => this.#animate());
+          if (Math.abs(this.targetFov - this.currentFov) > 0.01) {
+            this.currentFov += (this.targetFov - this.currentFov) * 0.15;
+            this.camera.fov = this.currentFov;
+            this.camera.updateProjectionMatrix();
+          }
+          this.controls.update();
+          this.renderer.render(this.scene, this.camera);
+        }
+
+        #getSize() {
+          const rect = this.container.getBoundingClientRect();
+          const width = rect.width || this.container.clientWidth || window.innerWidth;
+          const height = rect.height || Math.max(window.innerHeight * 0.6, 320);
+          return { width, height };
+        }
+
+        #handleResize() {
+          const { width, height } = this.#getSize();
+          this.camera.aspect = width / height;
+          this.camera.updateProjectionMatrix();
+          this.renderer.setSize(width, height);
+        }
+
+        #handleWheel(event) {
+          event.preventDefault();
+          const direction = Math.sign(event.deltaY);
+          this.targetFov = THREE.MathUtils.clamp(this.targetFov + direction * ZOOM_STEP, MIN_FOV, MAX_FOV);
+        }
+      }
+
+      const panoramaContainer = document.getElementById("panorama");
+      const loadingOverlay = document.getElementById("loading-overlay");
+      const errorBanner = document.getElementById("error-banner");
+      const dropzone = document.getElementById("dropzone");
+      const fileInput = document.getElementById("file-input");
+      const browseButton = document.getElementById("browse-button");
+
+      const viewer = new PanoramaViewer(panoramaContainer);
+      showLoading();
+      viewer.loadPanorama(DEFAULT_IMAGE, {
+        onLoad: () => hideLoading(),
+        onError: () => {
+          hideLoading();
+          showError("默认示例图片加载失败，请尝试上传本地文件。");
+        },
+      });
+
+      browseButton.addEventListener("click", () => fileInput.click());
+      dropzone.addEventListener("click", () => fileInput.click());
+      fileInput.addEventListener("change", (event) => {
+        if (event.target.files?.length) {
+          handleFile(event.target.files[0]);
+          fileInput.value = "";
+        }
+      });
+
+      ["dragenter", "dragover"].forEach((eventName) => {
+        dropzone.addEventListener(eventName, (event) => {
+          event.preventDefault();
+          event.stopPropagation();
+          dropzone.classList.add("active");
+        });
+      });
+
+      ["dragleave", "dragend", "drop"].forEach((eventName) => {
+        dropzone.addEventListener(eventName, (event) => {
+          event.preventDefault();
+          event.stopPropagation();
+          dropzone.classList.remove("active");
+        });
+      });
+
+      dropzone.addEventListener("drop", (event) => {
+        const files = event.dataTransfer?.files;
+        if (files?.length) {
+          handleFile(files[0]);
+        }
+      });
+
+      function handleFile(file) {
+        hideError();
+        if (!SUPPORTED_TYPES.includes(file.type)) {
+          showError("暂不支持的文件格式，请选择 JPG 或 PNG 全景图。");
+          return;
+        }
+
+        if (file.size > MAX_FILE_SIZE) {
+          showError("文件体积过大，请选择小于 10MB 的图片。");
+          return;
+        }
+
+        const objectUrl = URL.createObjectURL(file);
+        showLoading();
+        viewer.loadPanorama(objectUrl, {
+          onLoad: () => {
+            hideLoading();
+            URL.revokeObjectURL(objectUrl);
+          },
+          onError: () => {
+            hideLoading();
+            showError("图片加载失败，请确认文件是否为标准的全景图像。");
+            URL.revokeObjectURL(objectUrl);
+          },
+        });
+      }
+
+      function showLoading() {
+        loadingOverlay.classList.remove("hidden");
+      }
+
+      function hideLoading() {
+        loadingOverlay.classList.add("hidden");
+      }
+
+      function showError(message) {
+        errorBanner.textContent = message;
+        errorBanner.classList.add("active");
+      }
+
+      function hideError() {
+        errorBanner.textContent = "";
+        errorBanner.classList.remove("active");
+      }
+    </script>
+  </body>
+</html>

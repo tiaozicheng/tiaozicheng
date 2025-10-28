@@ -1,12 +1,37 @@
-- 👋 Hi, I’m @tiaozicheng
-- 👀 I’m interested in ...
-- 🌱 I’m currently learning ...
-- 💞️ I’m looking to collaborate on ...
-- 📫 How to reach me ...
-- 😄 Pronouns: ...
-- ⚡ Fun fact: ...
+# 360° 全景照片查看器
 
-<!---
-tiaozicheng/tiaozicheng is a ✨ special ✨ repository because its `README.md` (this file) appears on your GitHub profile.
-You can click the Preview link to take a look at your changes.
---->
+一个纯前端的全景照片展示页面，支持 360° 球形投影、拖拽查看和鼠标滚轮缩放，同时可以导入本地的 equirectangular 全景图像。
+
+## 功能特性
+
+- ✅ 360° 球形投影渲染，支持水平与垂直方向自由探索
+- ✅ 鼠标左键拖拽平滑旋转视角
+- ✅ 鼠标滚轮带有动画过渡的平滑缩放，限制最小 / 最大视场角
+- ✅ 支持 JPG / PNG 本地图片上传，拖拽或点击按钮均可
+- ✅ 加载状态提示与基本错误处理（格式 / 大小 / 加载失败）
+- ✅ 响应式布局，适配桌面与移动端浏览器
+
+## 使用方式
+
+1. 直接在支持 ES Modules 的现代浏览器中打开 `index.html`。
+2. 默认会加载一张示例全景图像，使用鼠标拖拽即可查看。
+3. 点击右侧面板中的“选择图片”按钮或拖拽图片到上传区域，导入本地的全景图像。
+4. 通过鼠标滚轮对视场角进行缩放，细看细节场景。
+
+> **提示**：推荐使用标准的 equirectangular 全景图（2:1 比例），文件建议小于 10 MB，以获得最佳体验。
+
+## 技术栈
+
+- [Three.js](https://threejs.org/) — 渲染球面与加载全景纹理
+- `OrbitControls` — 提供流畅的相机旋转体验
+- 原生 JavaScript / CSS — 构建界面与交互逻辑
+
+## 项目结构
+
+```
+.
+├── index.html    # 主页面，包含样式与交互逻辑
+└── README.md     # 项目说明
+```
+
+无需额外构建或安装依赖，适合快速预览或作为全景浏览功能的原型示例。
